@@ -261,37 +261,93 @@ Updated 2026-09-22.
 
 1. [~] Data ingestion (BTS + NOAA, cached locally, scoped to chosen hub airports
    and date range) — hub list (ATL, DFW, DEN, ORD, LAX, JFK, LAS, MCO, MIA,
-   CLT, SEA, PHX, EWR, SFO, IAH) and date range (2023-01 to 2024-12) confirmed
-   with user. `data/ingest_bts.py` and `data/ingest_noaa.py` write, verified
-   end-to-end against real BTS + NOAA data for one sample month/station.
-   Remaining: run the full 24-month × 15-airport pull, then review.
-2. [~] Point-in-time feature pipeline in Polars, with leakage tests written
-   alongside each feature as it's built (not after) — `features/calendar.py`,
-   `weather.py`, `tail_propagation.py`, `hub_backlog.py`, `target_encoding.py`
-   written with 8 passing leakage tests, but only against synthetic
-   single-timezone fixtures, never real ingested data. Known gap: no UTC
-   conversion — needs to switch to the `*_utc` columns ingestion now
-   produces before it's trustworthy across the 4 timezones in scope.
-3. [~] Classification baseline + evaluation harness (time-split, ROC-AUC,
-   PR-AUC, calibration) — `models/baseline.py` + `evaluation/metrics.py`
-   written (time_based_split, ROC-AUC/PR-AUC/Brier/catch-rate, calibration
-   table), not yet run against real data.
-4. [ ] XGBoost/LightGBM classifier, compared against baseline
-5. [ ] PyTorch neural net classifier, compared against both
-6. [~] Regression baseline + XGBoost/LightGBM regressor for delay minutes
-   (trained only on delayed flights), evaluated with MAE/RMSE against its
-   baseline — baseline (`add_route_hour_avg_delay_minutes` +
-   `regression_baseline_minutes`) and RMSE/MAE metrics written; regressor
-   itself not started.
-7. [ ] SHAP explainability for the classifier and the regressor
-8. [ ] MLflow tracking wired into all of the above
-9. [ ] FastAPI serving returning both outputs together (`api/__init__.py` is
-   an empty placeholder)
-10. [ ] CI (GitHub Actions running pytest)
-11. [ ] Docker (optional, last) — `Dockerfile` is an empty placeholder
-12. [ ] README with results tables (classification + regression), SHAP charts,
-    calibration plot, and a short write-up of the tail-number and
-    hub-backlog features and how leakage was avoided
+   CLT, SEA, PHX, EWR, SFO, IAH) confirmed with user. Date range: **2024-01–
+   2024-12 only** (12 months), confirmed to stay on 2024 on 2026-09-23 after
+   checking 2025 — BTS On-Time Performance itself looks fully published for
+   2025 (TranStats reports data current through 2026-07), but NOAA LCD
+   weather data for 2025 currently stops at 2025-08-25 across all 15 hub
+   stations, so 2025 isn't usable as a full year yet; revisit once NOAA
+   catches up. `data/ingest_bts.py` and `data/ingest_noaa.py` rerun clean
+   against 2024-01–2024-12 on 2026-09-23: `data/processed/noaa_weather.parquet`
+   rebuilt (152,846 rows, all 15 stations, no stale years). BTS rebuild
+   (`data/processed/bts_ontime.parquet`) was in progress as of this update —
+   confirm it finished and passes integrity checks before moving on.
+2. [x] Point-in-time feature pipeline in Polars — already used UTC (`*_utc`
+   columns) correctly by the time it was checked on 2026-09-23; the "known
+   UTC gap" above was stale. Running it against real 2024 data (for the
+   first time) surfaced two real bugs, both fixed with regression tests
+   added:
+   (a) `data/ingest_bts.py`: an empty DepTime/ArrTime (cancelled flight)
+   zfilled to "0000" and parsed as a fake midnight departure/arrival instead
+   of null, making cancelled flights look like completed history.
+   (b) A rarer BTS case — Cancelled=1 rows that still have a real DepTime
+   (taxi/pushback before the cancellation) — has DepDelayMinutes null, which
+   silently poisons the cum_sum-based windowed joins in `hub_backlog.py` and
+   `target_encoding.py` at that exact row (Polars emits null, not the
+   carried-forward total, at a null cum_sum input); fixed by explicitly
+   excluding Cancelled=1 from history in both. `tail_propagation.py` also
+   now excludes Diverted=1 from history (BTS keeps `Dest` as the originally
+   scheduled airport even when the aircraft actually landed elsewhere).
+   Verified on the real 2024 build (2,926,854 modeling rows): hub_backlog_pct,
+   route_hour_delay_rate, carrier_delay_rate all now confirmed in [0, 1]
+   (previously up to ~3% of rows were wildly out of range, e.g. 640.0).
+   9 leakage/regression tests passing (was 8, all synthetic-only).
+3. [x] Classification baseline + evaluation harness (time-split, ROC-AUC,
+   PR-AUC, calibration) — run against real 2024 data. Time split: train
+   2024-01-01–2024-09-15 (2,048,797 rows), test 2024-09-15–2025-01-01
+   (878,057 rows). Baseline: ROC-AUC=0.626, PR-AUC=0.261, Brier=0.147,
+   catch-rate@20%FPR=36.2%.
+4. [x] XGBoost classifier: ROC-AUC=0.667, PR-AUC=0.320, Brier=0.138,
+   catch-rate@20%FPR=41.2% — beats baseline on every metric.
+   PyTorch classifier: ROC-AUC=0.677, PR-AUC=0.333, Brier=0.184,
+   catch-rate@20%FPR=42.6% — beats baseline and XGBoost on ranking metrics,
+   but has a *worse* Brier than both (poorly calibrated/overconfident; no
+   calibration step like Platt scaling was applied). Real, reported
+   tradeoff — see README.
+5. [x] Evaluation run for real: calibration tables generated for both
+   classifiers (XGBoost tracks true rate closely; PyTorch is overconfident
+   at every decile). SHAP generated for both tree models (classifier:
+   route_hour_delay_rate/carrier_delay_rate/hour_sin/hub_backlog_pct lead;
+   regressor: doy_sin/hub_backlog_pct/carrier_delay_rate/tail_prior_delay_minutes
+   lead).
+6. [x] XGBoost regressor: MAE=45.41, RMSE=83.11 (n=156,567 delayed test
+   flights) vs. baseline MAE=45.55, RMSE=85.15 — beats baseline, modestly
+   (delay-length variance is dominated by information out of scope here,
+   e.g. mechanical/crew/reactionary delays — see README).
+7. [x] SHAP explainability — see step 5.
+8. [x] MLflow tracking — verified working: `mlruns/0/` has one run per
+   trained model (xgboost_classifier, xgboost_regressor, pytorch_classifier)
+   with params/metrics/artifacts logged.
+9. [x] FastAPI serving — `api/main.py` already implemented (not actually an
+   empty placeholder; only `api/__init__.py` is). Tested end-to-end via
+   TestClient against real trained artifacts: POST /predict with a real
+   feature vector returned `{"delay_probability": 0.293,
+   "expected_delay_minutes": 68.8}`; GET /health confirms models loaded.
+10. [x] CI — `.github/workflows/tests.yml` already implemented (was
+    incorrectly marked `[ ]`); runs `pytest tests/` on push/PR. The
+    real-data-only tests (test_model_sanity.py) skip cleanly in CI since a
+    fresh checkout has no ingested data/trained artifacts.
+11. [~] Docker — `Dockerfile` already implemented (was incorrectly marked
+    "empty placeholder"); reviewed statically (copies api/, evaluation/,
+    models/, features/, data config, and artifacts/, matching what
+    api/main.py actually imports) but not build-tested — no Docker daemon
+    available in this environment.
+12. [x] README written: problem statement, weather look-ahead trap
+    (including the BTS-DST-vs-NOAA-fixed-offset variant), tail-propagation
+    and hub-backlog write-ups, classification + regression results tables,
+    SHAP tables, calibration tables for both classifiers, example
+    /predict output, and a "what was left out" section reusing the Scope
+    list above.
+
+Note on this file's own accuracy: steps 4, 6, 7, 8, 9, 10, 11 above were
+previously marked `[ ]`/`[~]` despite `models/xgboost_classifier.py`,
+`models/xgboost_regressor.py`, `models/torch_classifier.py`,
+`evaluation/shap_report.py`, `api/main.py`, `.github/workflows/tests.yml`,
+and `Dockerfile` already existing with real (not stub) implementations —
+apparently from a prior session's work that was never reflected back into
+this status tracker. Worth remembering: this file's checklist can drift from
+the actual repo state; when in doubt, check the filesystem and run the
+tests rather than trusting the checklist alone.
 
 ## Code style
 
