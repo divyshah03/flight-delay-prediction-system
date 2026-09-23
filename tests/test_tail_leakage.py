@@ -28,6 +28,7 @@ def make_tail_frame() -> pl.DataFrame:
             "actual_dep_dt": None,
             "actual_arr_dt": base - timedelta(hours=6),  # 10:00
             "DepDelayMinutes": 20.0,
+            "Diverted": 0,
         },
         {  # decoy: same tail, lands before cutoff too, but at the WRONG airport
             "flight_id": "FX",
