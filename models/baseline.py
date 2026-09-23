@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
+from features.target_encoding import windowed_rate
+
 
 def classification_baseline_proba(frame: pl.DataFrame) -> np.ndarray:
     """Predict delay probability as the route/hour historical delay rate.
@@ -39,29 +41,20 @@ def add_route_hour_avg_delay_minutes(
     """Moving-window average delay minutes among historically delayed peers.
 
     Cutoff rule: only delayed flights with actual_dep_dt < cutoff_dt contribute.
+
+    Uses the same cumulative-sum as-of-join technique as
+    features/target_encoding.py (see its module docstring) rather than a
+    self-join, which is O(n^2) per route/hour group and doesn't finish at
+    real BTS scale.
     """
-    delayed_history = flights.filter(pl.col("DepDelayMinutes") >= delay_threshold).select(
-        [
-            pl.col("route"),
-            pl.col("hour_of_day"),
-            pl.col("actual_dep_dt"),
-            pl.col("DepDelayMinutes"),
-            pl.col("flight_id").alias("hist_flight_id"),
-        ]
-    )
-    current = flights.select(["flight_id", "route", "hour_of_day", "cutoff_dt"])
-    avgs = (
-        current.join(delayed_history, on=["route", "hour_of_day"], how="left")
-        .filter(
-            pl.col("actual_dep_dt").is_not_null()
-            & (pl.col("actual_dep_dt") < pl.col("cutoff_dt"))
-            & (
-                pl.col("actual_dep_dt")
-                >= (pl.col("cutoff_dt") - pl.duration(days=lookback_days))
-            )
-            & (pl.col("hist_flight_id") != pl.col("flight_id"))
-        )
-        .group_by("flight_id")
-        .agg(pl.col("DepDelayMinutes").mean().alias("route_hour_avg_delay_minutes"))
+    delayed_history = flights.filter(pl.col("DepDelayMinutes") >= delay_threshold)
+    avgs = windowed_rate(
+        flights,
+        ["route", "hour_of_day"],
+        "DepDelayMinutes",
+        lookback_days,
+        "route_hour_avg_delay_minutes",
+        default=30.0,
+        history_source=delayed_history,
     )
     return flights.join(avgs, on="flight_id", how="left")
