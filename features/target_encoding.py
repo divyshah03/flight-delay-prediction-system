@@ -114,6 +114,7 @@ def add_moving_target_encoding(
         "cutoff_dt",
         "actual_dep_dt",
         "DepDelayMinutes",
+        "Cancelled",
     }
     missing = required - set(flights.columns)
     if missing:
