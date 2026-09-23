@@ -268,11 +268,11 @@ Updated 2026-09-22.
    2025 (TranStats reports data current through 2026-07), but NOAA LCD
    weather data for 2025 currently stops at 2025-08-25 across all 15 hub
    stations, so 2025 isn't usable as a full year yet; revisit once NOAA
-   catches up. `data/ingest_bts.py` and `data/ingest_noaa.py` rerun clean
-   against 2024-01–2024-12 on 2026-09-23: `data/processed/noaa_weather.parquet`
-   rebuilt (152,846 rows, all 15 stations, no stale years). BTS rebuild
-   (`data/processed/bts_ontime.parquet`) was in progress as of this update —
-   confirm it finished and passes integrity checks before moving on.
+   catches up. `data/ingest_bts.py` and `data/ingest_noaa.py` run clean
+   against 2024-01–2024-12, confirmed complete and verified: `bts_ontime.parquet`
+   (4,995,321 rows, all 12 months) and `noaa_weather.parquet` (152,846 rows,
+   all 15 stations). `data/ingest_bts.py` also had a real timestamp-parsing
+   bug fixed here (see step 2) and was rerun after that fix.
 2. [x] Point-in-time feature pipeline in Polars — already used UTC (`*_utc`
    columns) correctly by the time it was checked on 2026-09-23; the "known
    UTC gap" above was stale. Running it against real 2024 data (for the
