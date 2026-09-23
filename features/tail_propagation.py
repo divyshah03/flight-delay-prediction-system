@@ -59,13 +59,19 @@ def add_tail_propagation(flights: pl.DataFrame) -> pl.DataFrame:
         "cutoff_dt",
         "actual_arr_dt",
         "DepDelayMinutes",
+        "Diverted",
     }
     missing = required - set(flights.columns)
     if missing:
         raise ValueError(f"flights missing columns for tail propagation: {sorted(missing)}")
 
+    # Diverted=1 rows are excluded from history: BTS keeps `Dest` as the
+    # originally-scheduled destination even when the aircraft actually landed
+    # at a different (diversion) airport, which this dataset doesn't capture.
+    # Matching on Dest for such a row would seat the aircraft at an airport it
+    # never reached, corrupting the next leg's prior-flight lookup.
     history = (
-        flights.filter(pl.col("actual_arr_dt").is_not_null())
+        flights.filter(pl.col("actual_arr_dt").is_not_null() & (pl.col("Diverted") == 0))
         .select(
             pl.col("Tail_Number"),
             pl.col("Dest").alias("_airport"),
