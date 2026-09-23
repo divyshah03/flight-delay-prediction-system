@@ -86,3 +86,29 @@ def test_bts_and_noaa_disagree_on_summer_utc_offset_for_atlanta():
 
     assert bts_utc.replace(tzinfo=None) != noaa_utc
     assert abs((bts_utc.replace(tzinfo=None) - noaa_utc).total_seconds()) == 3600
+
+
+def test_cancelled_flight_empty_time_stays_null_not_midnight():
+    """Regression test: a cancelled flight's DepTime/ArrTime is an empty
+    string in raw BTS data, not "0000". str.zfill("") == "0000", so a naive
+    implementation silently turns "no departure" into "midnight departure" --
+    which then wrongly makes the cancelled flight look like completed history
+    to every downstream point-in-time feature (hub backlog, tail propagation,
+    target encoding all filter on `actual_dep_dt/actual_arr_dt is not null`
+    to mean "this flight happened").
+    """
+    df = pl.DataFrame(
+        {
+            "FlightDate": ["2024-01-11", "2024-01-11"],
+            "CRSDepTime": ["1000", "1000"],
+            "DepTime": ["1005", ""],  # second row: cancelled, never departed
+            "CRSArrTime": ["1200", "1200"],
+            "ArrTime": ["1210", ""],
+            "Origin": ["ATL", "ATL"],
+            "Dest": ["ORD", "ORD"],
+        }
+    )
+    out = _add_utc_timestamps(df)
+    assert out["actual_dep_utc"][0] is not None
+    assert out["actual_dep_utc"][1] is None
+    assert out["actual_arr_utc"][1] is None
