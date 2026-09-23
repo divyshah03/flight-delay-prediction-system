@@ -104,19 +104,24 @@ def _add_utc_timestamps(df: pl.DataFrame) -> pl.DataFrame:
     def parse_hhmm_to_datetime(date_col: str, time_col: str) -> pl.Expr:
         # BTS times are zero-padded 4-char HHMM strings ("0830"), with a rare
         # "2400" meaning midnight of the *next* day. Empty string = missing
-        # (e.g. a cancelled flight's DepTime).
-        t = pl.col(time_col).str.zfill(4)
+        # (e.g. a cancelled flight's DepTime) and must stay null -- str.zfill
+        # on "" produces "0000", which would otherwise silently become a fake
+        # midnight departure/arrival instead of no departure/arrival at all.
+        raw = pl.col(time_col)
+        is_missing = raw.is_null() | (raw == "")
+        t = raw.str.zfill(4)
         is_2400 = t == "2400"
         hour = pl.when(is_2400).then(0).otherwise(t.str.slice(0, 2).cast(pl.Int8, strict=False))
         minute = t.str.slice(2, 2).cast(pl.Int8, strict=False)
         base_date = pl.col(date_col).str.to_date("%Y-%m-%d")
         day_offset = pl.when(is_2400).then(1).otherwise(0)
-        return (
+        result = (
             (base_date.dt.offset_by(day_offset.cast(pl.Utf8) + "d"))
             .cast(pl.Datetime("us"))
             .dt.offset_by(hour.cast(pl.Utf8) + "h")
             .dt.offset_by(minute.cast(pl.Utf8) + "m")
         )
+        return pl.when(is_missing).then(None).otherwise(result)
 
     df = df.with_columns(
         parse_hhmm_to_datetime("FlightDate", "CRSDepTime").alias("_sched_dep_local_naive"),
