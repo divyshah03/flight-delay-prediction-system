@@ -45,9 +45,10 @@ Updated 2026-09-23 — see Build order below for the step-by-step breakdown.
 7. [x] MLflow experiment tracking
 8. [x] Tests: no-leakage checks + API tests
 9. [x] CI (GitHub Actions running tests on push)
-10. [~] Docker (nice-to-have polish, not core — do this last, and skip it
-    entirely if time is short) — Dockerfile exists and reviewed, but not
-    build-tested (no Docker daemon available in this environment).
+10. [x] Docker (nice-to-have polish, not core) — built and run end-to-end on
+    2026-09-23: `docker build`, then `docker run` serving real traffic;
+    `/health` and `/predict` verified to return identical output to the
+    non-containerized API (29.3% delay probability, ~68.8 min expected).
 
 **Explicitly out of scope. Do NOT build these unless the user asks:**
 - Any frontend (no React, no web UI). A Streamlit demo is optional
