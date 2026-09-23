@@ -100,13 +100,14 @@ def train_classifier(
     stds = np.where((stds == 0) | np.isnan(stds), 1.0, stds)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    loader_generator = torch.Generator().manual_seed(seed)
 
     def make_loader(split: pl.DataFrame, shuffle: bool) -> DataLoader:
         cat_tensors = {col: torch.from_numpy(vocabs[col].encode(split[col])) for col in CAT_COLUMNS}
         dense = torch.from_numpy(_dense_matrix(split, means, stds))
         y = torch.from_numpy(split["is_delayed"].to_numpy().astype(np.float32))
         dataset = TensorDataset(cat_tensors["Origin"], cat_tensors["Reporting_Airline"], cat_tensors["route"], dense, y)
-        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, generator=loader_generator if shuffle else None)
 
     train_loader = make_loader(train, shuffle=True)
     test_loader = make_loader(test, shuffle=False)
