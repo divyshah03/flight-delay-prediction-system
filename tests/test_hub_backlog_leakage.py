@@ -42,3 +42,25 @@ def test_hub_backlog_only_uses_pre_cutoff_departures() -> None:
     assert out["hub_backlog_pct"].min() >= 0.0
     assert out["hub_backlog_pct"].max() <= 1.0
     assert bad.height >= 0  # join can find post-cutoff peers; feature must ignore them
+
+
+def test_hub_backlog_ignores_cancelled_flight_with_phantom_deptime() -> None:
+    """Regression test: a real BTS edge case has Cancelled=1 rows with a
+    non-null actual_dep_dt (a recorded taxi/pushback before the cancellation)
+    and a null DepDelayMinutes. If that row isn't excluded, the null poisons
+    the cum_sum-based windowed aggregate at that row -- corrupting
+    hub_backlog_pct for every later flight whose window's as-of match lands
+    on it, producing nonsensical values far outside [0, 1].
+    """
+    flights = add_cutoff_time(make_flight_frame())
+    phantom = flights.filter(pl.col("flight_id") == "F1").with_columns(
+        pl.lit("F0").alias("flight_id"),
+        (pl.col("cutoff_dt") - pl.duration(hours=1)).alias("cutoff_dt"),
+        (pl.col("actual_dep_dt") - pl.duration(hours=5)).alias("actual_dep_dt"),
+        pl.lit(None, dtype=pl.Float64).alias("DepDelayMinutes"),
+        pl.lit(1).cast(flights.schema["Cancelled"]).alias("Cancelled"),
+    )
+    flights = pl.concat([phantom, flights])
+    out = add_hub_backlog(flights, window_hours=3)
+    assert out["hub_backlog_pct"].min() >= 0.0
+    assert out["hub_backlog_pct"].max() <= 1.0
