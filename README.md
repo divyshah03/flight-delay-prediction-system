@@ -1,100 +1,51 @@
-# Flight Delay Prediction
+# ✈️ Flight Delay Prediction
 
-Predicts whether a US domestic flight will be delayed 15+ minutes, and if so
-by how many minutes, using only information available **4 hours before
-scheduled departure (T-4h)**. Given a flight and that cutoff, the system
-outputs two numbers together:
+Predicts whether a US domestic flight will be delayed 15+ minutes — and if so, by how many — using only information available **4 hours before scheduled departure (T-4h)**.
 
-> **78% chance of delay, expected ~22 minutes late**
+> 🔮 **78% chance of delay, expected ~22 minutes late**
 
-This is a portfolio project built to demonstrate real ML judgment rather than
-a Kaggle-style "train XGBoost, report accuracy" exercise: careful
-point-in-time feature engineering with no leakage, a real baseline that both
-trained models must beat, honest (not cherry-picked) evaluation, and a model
-that's actually served behind an API.
+A portfolio project built to show real ML judgment, not a Kaggle-style "train XGBoost, report accuracy" exercise: point-in-time feature engineering with no leakage, a real baseline both trained models must beat, honest evaluation, and a model actually served behind an API.
 
-Scope: the top 15 US hub airports (ATL, DFW, DEN, ORD, LAX, JFK, LAS, MCO,
-MIA, CLT, SEA, PHX, EWR, SFO, IAH), full calendar year 2024, ~2.9M flights in
-the modeling population after filtering to flights actually departing a hub.
+**Scope:** top 15 US hub airports, full calendar year 2024, ~2.9M flights.
 
-## The weather look-ahead trap
+## 🌦️ The weather look-ahead trap
 
-You cannot use the weather observation at flight time to predict a flight
-before it departs — that observation is the weather that *caused or
-coincided with* the delay, so using it is leakage dressed up as a feature.
+You can't use the weather observation *at* flight time to predict a flight before it departs — that's the weather that caused the delay, so using it is leakage.
 
-The fix: every weather feature (temperature, wind, precipitation, visibility,
-ceiling, and the derived IFR flag) comes from the NOAA METAR observation
-timestamped at or before T-4h, at both origin and destination, joined with a
-Polars `join_asof(strategy="backward")` against the cutoff timestamp — never
-against the scheduled or actual departure time.
+**Fix:** every weather feature comes from the METAR observation at or before T-4h, joined via `join_asof(strategy="backward")` against the cutoff — never the actual departure time.
 
-A second, easy-to-miss version of the same trap: BTS on-time data is
-DST-aware local time, but NOAA's LCD weather product uses a fixed local
-standard offset year-round. Comparing the two as if they were on the same
-clock silently misaligns the weather-to-flight join by an hour for roughly
-eight months of the year. Both sources are converted to UTC independently
-(BTS via each airport's IANA timezone, NOAA via its fixed standard offset)
-before any join happens — see `data/ingest_bts.py` and `data/airports.py`.
+**Second trap:** BTS flight times are DST-aware local time; NOAA's LCD weather product is fixed local *standard* time year-round. Treating them as the same clock misaligns the weather join by an hour for ~8 months of the year. Both are converted to UTC independently (BTS via IANA timezone, NOAA via fixed offset) — see `data/ingest_bts.py` / `data/airports.py`.
 
-## The two headline features
+## 🛫 The two headline features
 
-**Tail-number delay propagation** — was this specific aircraft's most
-recently completed flight delayed, and by how much? Implemented as an
-as-of join keyed on `(Tail_Number, airport)`, matching a candidate prior
-flight's `Dest` against the current flight's `Origin` and gating on the
-prior flight's actual *arrival* time (not departure) — arrival guarantees
-the leg is fully complete, so its delay is a known, final quantity. This
-also fixes a real bug from an earlier version of the function, which joined
-on tail number alone with no airport check and could credit a flight with a
-"prior delay" from an aircraft that most recently landed somewhere else
-entirely. Diverted flights are excluded from this join's history: BTS keeps
-`Dest` as the *originally scheduled* airport even when the aircraft actually
-landed elsewhere, so trusting it there would seat the aircraft at an airport
-it never reached.
+**Tail-number delay propagation** — was this aircraft's most recent completed flight delayed, and by how much? An as-of join on `(Tail_Number, airport)`, matching a prior flight's `Dest` to the current flight's `Origin`, gated on the prior flight's actual *arrival* time (guarantees it's a known, final delay). Diverted flights are excluded from history — BTS keeps `Dest` as the originally-scheduled airport even when the plane actually landed elsewhere.
 
-**Hub network backlog index** — the percentage of flights that departed the
-same origin airport delayed in the 3 hours before cutoff, i.e. "are delays
-cascading through this airport right now." Computed as a cumulative-count
-as-of join rather than a self-join (a self-join is O(n²) per airport and
-does not finish at real BTS scale); a window's count is `cumulative(b) -
-cumulative(a)` from two backward as-of joins against a running per-airport
-cumulative sum.
+**Hub backlog index** — % of flights that departed the same origin airport delayed in the 3 hours before cutoff ("are delays cascading right now"). Computed as a cumulative-count as-of join, not a self-join (self-join is O(n²) per airport and doesn't finish at BTS scale).
 
-Both features, along with the moving-window route/hour and carrier target
-encodings, are also where the project's one real, hard-won bug surfaced —
-see [What running this against real data actually caught](#what-running-this-against-real-data-actually-caught).
+Both features — plus the moving-window target encodings — are where the project's real bugs surfaced. See [What running this against real data caught](#-what-running-this-against-real-data-caught).
 
-## Results
+## 📊 Results
 
 ### Classification — delay probability
 
-Time-based split: train on Jan 1 – Sep 15 2024 (70%, ~2.05M flights), test on
-Sep 15 2024 – Jan 1 2025 (30%, ~878K flights). Never shuffled across time.
+Time-based split: train Jan 1–Sep 15 2024 (70%, ~2.05M), test Sep 15 2024–Jan 1 2025 (30%, ~878K). Never shuffled across time.
 
-| Model | ROC-AUC | PR-AUC | Brier | Catch-rate @ 20% false-alarm rate |
+| Model | ROC-AUC | PR-AUC | Brier | Catch-rate @ 20% FPR |
 |---|---|---|---|---|
-| Baseline (route/hour historical delay rate) | 0.626 | 0.261 | 0.147 | 36.2% |
+| Baseline (route/hour rate) | 0.626 | 0.261 | 0.147 | 36.2% |
 | XGBoost | 0.667 | 0.320 | **0.138** | 41.2% |
-| PyTorch (embeddings + MLP) | **0.677** | **0.333** | 0.184 | **42.6%** |
+| PyTorch (embeddings + MLP) | **0.670** | 0.320 | 0.198 | **41.4%** |
 
-Both trained models beat the baseline on every ranking metric. **Plain
-language**: at a false-alarm rate of 1 in 5, the XGBoost model correctly
-flags 41% of real delays, and the neural net flags 43% — versus 36% for
-"just use the historical route/hour rate."
+🎯 **Plain language:** at a 1-in-5 false-alarm rate, both trained models catch ~41% of real delays vs. 36% for "just use the historical rate."
 
-The PyTorch model wins on ranking (ROC-AUC, PR-AUC, catch-rate) but has a
-*worse* Brier score than either XGBoost or the baseline — its probabilities
-are less trustworthy as literal probabilities, even though it separates
-delayed from on-time flights slightly better.
+PyTorch narrowly edges XGBoost on ROC-AUC/catch-rate and ties on PR-AUC, but has a clearly worse Brier score (0.198 vs 0.138) — its probabilities are less trustworthy even though it separates classes about as well. *(PyTorch trained with a fixed seed — `torch`/`numpy`/`random` + a seeded `DataLoader` generator — so these numbers reproduce exactly on rerun; confirmed via two independent runs producing bit-identical metrics.)*
 
-![Calibration: XGBoost vs. PyTorch](evaluation/plots/calibration_classifiers.png)
+<img src="evaluation/plots/calibration_classifiers.png" alt="Calibration: XGBoost vs PyTorch" width="420">
 
-XGBoost tracks the diagonal (perfect calibration) closely; PyTorch sits well
-below it at every decile, meaning it systematically overstates delay risk.
-Exact decile values:
+XGBoost tracks the diagonal closely; PyTorch sits below it at every decile — it systematically overstates risk.
 
-**XGBoost** (predicted vs. actual delay rate, by decile of predicted risk):
+<details>
+<summary><b>XGBoost calibration deciles</b></summary>
 
 | Predicted | Actual | n |
 |---|---|---|
