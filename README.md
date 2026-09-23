@@ -140,88 +140,43 @@ POST /predict
 }
 
 200 OK
-{
-  "delay_probability": 0.293,
-  "expected_delay_minutes": 68.8
-}
+{ "delay_probability": 0.293, "expected_delay_minutes": 68.8 }
 ```
 
-Read as: "29% chance of delay, expected ~69 minutes late." The two numbers
-are computed independently (classifier and regressor never combine
-mathematically) and returned together, per the project's framing.
+→ "29% chance of delay, expected ~69 minutes late." The two numbers are computed independently and returned together.
 
-## What running this against real data actually caught
+## 🐛 What running this against real data caught
 
-The point-in-time feature pipeline was written and unit-tested against
-small synthetic, single-timezone fixtures before ever touching real BTS
-data. Running it end-to-end against the real 2024 ingest for the first time
-surfaced two real, non-obvious bugs — exactly the kind of thing this
-project's testing discipline exists to catch, and exactly why "run it against
-real data before you trust it" earns its place as a separate build step:
+Two real bugs surfaced running the pipeline against real 2024 BTS data for the first time:
 
-1. **A parsing bug in ingestion**: BTS represents a cancelled flight's
-   `DepTime`/`ArrTime` as an empty string. `str.zfill(4)` on an empty string
-   produces `"0000"`, so the empty-string case was silently parsed as a real
-   midnight departure/arrival instead of staying null — making every
-   cancelled flight look like completed flight history to every downstream
-   feature.
-2. **A subtler data-quality edge case**: a small number of BTS rows are
-   marked `Cancelled=1` but still carry a real `DepTime` (a taxi/pushback
-   recorded before the cancellation), leaving `DepDelayMinutes` null even
-   though the departure timestamp is populated. Polars' `cum_sum()` emits
-   `null` (not the carried-forward running total) at the exact row where its
-   input is null — so when a cumulative-count as-of join (the technique used
-   for hub backlog and target encoding, to stay out of O(n²) self-join
-   territory) happened to land on one of these rows, it silently reset that
-   window's "count so far" to zero. The result: `hub_backlog_pct` (which
-   should always be a fraction in [0, 1]) came out as high as 640 for about
-   3% of flights before the fix.
+1. **Cancelled-flight parsing**: BTS represents a cancelled flight's `DepTime` as an empty string. `str.zfill(4)` on `""` → `"0000"`, silently parsed as a real midnight departure instead of null — making cancelled flights look like completed history to every downstream feature.
+2. **Null-poisoned cumulative joins**: some `Cancelled=1` rows still carry a real `DepTime` but null `DepDelayMinutes`. Polars' `cum_sum()` emits `null` (not the carried-forward total) at that exact row — silently resetting the running count for hub backlog / target encoding. Result: `hub_backlog_pct` (should be in [0, 1]) hit values as high as 640 for ~3% of flights before the fix.
 
-Both are fixed (excluding `Cancelled=1` explicitly from every historical
-aggregate's input, on top of the corrected null timestamps) and covered by
-regression tests. Diverted-flight handling in tail propagation (above) was
-found and fixed the same way.
+Both fixed (exclude `Cancelled=1` from all historical aggregates) and covered by regression tests. Diverted-flight handling in tail propagation was found and fixed the same way.
 
-## What I deliberately left out, and why
+## ✂️ What I deliberately left out, and why
 
-- **Crew connection risk / tight-turn modeling** — crew scheduling data
-  isn't realistically available outside an airline's internal systems.
-- **Crosswind component via runway-heading trigonometry** — real signal for
-  a subset of delays, but the runway-configuration data needed to compute it
-  well isn't in scope for a batch/historical project at this size.
-- **Weather forecast divergence deltas** (rate of change of TAF forecasts) —
-  a legitimate stretch goal, not required; T-4h actual observations are
-  simpler and sufficient here.
-- **Continuous holiday-proximity curves** — `is_holiday` is a simple binary
-  flag for major US holidays; a smooth days-to-holiday curve would be more
-  expressive but adds complexity out of proportion to what a portfolio
-  project needs to demonstrate.
-- **Airport capacity tiering / scheduled-volume modeling** beyond what's a
-  natural byproduct of the hub backlog feature.
-- **Multi-airline crew/aircraft rotation network graphs** — a materially
-  larger project (real-time ops research), not a resume-scoped one.
-- **Real-time / streaming inference** — this is a batch, historical-data
-  project; a live flight-tracking pipeline is a different project with a
-  different engineering problem (state, freshness, backpressure) at its
-  center.
+- **Crew connection risk / tight-turn modeling** — crew scheduling data isn't realistically available outside an airline.
+- **Crosswind via runway-heading trigonometry** — real signal, but out of scope for this size project.
+- **Weather forecast divergence deltas** — legitimate stretch goal, not required.
+- **Continuous holiday-proximity curves** — a binary `is_holiday` flag is enough.
+- **Airport capacity tiering** beyond what's a byproduct of hub backlog.
+- **Multi-airline crew/aircraft rotation graphs** — a materially larger project.
+- **Real-time/streaming inference** — this is a batch, historical project.
 
-The rule applied throughout: if a feature idea couldn't be explained
-correctly in one sentence without notes, it didn't belong here.
+Rule applied: if a feature idea couldn't be explained correctly in one sentence, it didn't belong here.
 
-## Architecture
+## 🏗️ Architecture
 
 ```
-data/         BTS On-Time Performance + NOAA LCD weather ingestion (Polars)
-features/     Point-in-time feature pipeline: calendar, weather-at-cutoff,
-              tail propagation, hub backlog, moving-window target encoding
+data/         BTS + NOAA ingestion (Polars)
+features/     Point-in-time pipeline: calendar, weather-at-cutoff,
+              tail propagation, hub backlog, target encoding
 models/       Baseline, XGBoost classifier + regressor, PyTorch classifier
-evaluation/   Time-based split, classification/regression metrics, SHAP
-api/          FastAPI POST /predict — returns both outputs together
-tests/        Leakage tests (one per point-in-time feature) + API tests +
-              model sanity tests
+evaluation/   Time-based split, metrics, SHAP
+api/          FastAPI POST /predict
+tests/        Leakage tests + API tests + model sanity tests
 ```
-
-Run the pipeline:
 
 ```bash
 python -m data.ingest_bts
