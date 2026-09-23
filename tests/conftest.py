@@ -63,7 +63,7 @@ def make_weather_frame() -> pl.DataFrame:
             {
                 "airport": "ATL",
                 "obs_dt": noon - timedelta(hours=1),
-                "temp_c": 28.0,
+                "temperature_f": 82.0,
                 "wind_speed_kt": 8.0,
                 "precip_in": 0.0,
                 "visibility_mi": 10.0,
@@ -72,7 +72,7 @@ def make_weather_frame() -> pl.DataFrame:
             {
                 "airport": "ATL",
                 "obs_dt": noon,
-                "temp_c": 29.0,
+                "temperature_f": 84.0,
                 "wind_speed_kt": 12.0,
                 "precip_in": 0.1,
                 "visibility_mi": 0.25,
@@ -81,7 +81,7 @@ def make_weather_frame() -> pl.DataFrame:
             {
                 "airport": "ATL",
                 "obs_dt": noon + timedelta(hours=3),  # after cutoff for F1 — must not leak
-                "temp_c": 18.0,
+                "temperature_f": 64.0,
                 "wind_speed_kt": 40.0,
                 "precip_in": 1.0,
                 "visibility_mi": 0.1,
@@ -90,7 +90,7 @@ def make_weather_frame() -> pl.DataFrame:
             {
                 "airport": "DFW",
                 "obs_dt": noon,
-                "temp_c": 32.0,
+                "temperature_f": 90.0,
                 "wind_speed_kt": 15.0,
                 "precip_in": 0.0,
                 "visibility_mi": 8.0,
@@ -99,7 +99,7 @@ def make_weather_frame() -> pl.DataFrame:
             {
                 "airport": "ORD",
                 "obs_dt": noon,
-                "temp_c": 20.0,
+                "temperature_f": 68.0,
                 "wind_speed_kt": 10.0,
                 "precip_in": 0.0,
                 "visibility_mi": 6.0,

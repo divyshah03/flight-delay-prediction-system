@@ -28,7 +28,7 @@ def test_weather_uses_latest_obs_at_or_before_cutoff() -> None:
     out = add_weather_at_cutoff(flights, weather)
     # F1 cutoff is noon; noon obs (vis 0.25) is allowed, post-cutoff storm is not.
     assert out["origin_visibility_mi"][0] == 0.25
-    assert out["origin_temp_c"][0] == 29.0
+    assert out["origin_temperature_f"][0] == 84.0
 
 
 def test_ifr_flag_from_cutoff_weather() -> None:
