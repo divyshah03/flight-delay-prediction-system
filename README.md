@@ -105,16 +105,13 @@ Trained/evaluated only on flights with `DepDelayMinutes >= 15` (156,567 in test)
 | carrier_delay_rate | 0.258 |
 | hour_sin | 0.247 |
 | hub_backlog_pct | 0.210 |
-| doy_cos | 0.141 |
-| doy_sin | 0.141 |
+| doy_cos / doy_sin | 0.141 |
 | origin_ceiling_ft | 0.093 |
 | tail_prior_delay_minutes | 0.074 |
 
-**Regressor:**
+**Regressor**
 
-![SHAP feature importance — XGBoost regressor](evaluation/plots/shap_regressor.png)
-
-Top features by mean |SHAP value|:
+<img src="evaluation/plots/shap_regressor.png" alt="SHAP — XGBoost regressor" width="380">
 
 | Feature | Mean \|SHAP\| |
 |---|---|
