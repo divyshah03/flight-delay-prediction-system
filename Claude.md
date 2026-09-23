@@ -26,23 +26,26 @@ Build exactly these pieces. Do not add anything beyond this list without
 asking first — this project has a documented history of scope creep and we
 are deliberately keeping it tight.
 
-1. Data ingestion: BTS On-Time Performance + NOAA weather
-2. Point-in-time feature pipeline (see Features below — this is the core of
+Status key: `[x]` done & verified · `[~]` in progress / partial · `[ ]` not started.
+Updated 2026-09-22 — see Build order below for the step-by-step breakdown.
+
+1. [~] Data ingestion: BTS On-Time Performance + NOAA weather
+2. [~] Point-in-time feature pipeline (see Features below — this is the core of
    the project)
-3. Baseline models (historical delay rate lookup for classification;
+3. [~] Baseline models (historical delay rate lookup for classification;
    historical average delay minutes for regression)
-4. Two trained classification models (XGBoost/LightGBM and a PyTorch
+4. [ ] Two trained classification models (XGBoost/LightGBM and a PyTorch
    neural net) predicting delay probability, PLUS one regression model
    (XGBoost/LightGBM is fine — do not build a second PyTorch model for
    this) predicting expected delay minutes, trained only on flights that
    were actually delayed
-5. Evaluation: time-based split, ROC-AUC + PR-AUC + calibration for
+5. [~] Evaluation: time-based split, ROC-AUC + PR-AUC + calibration for
    classification, MAE/RMSE for regression, SHAP for both
-6. Serving: a FastAPI `/predict` endpoint
-7. MLflow experiment tracking
-8. Tests: no-leakage checks + API tests
-9. CI (GitHub Actions running tests on push)
-10. Docker (nice-to-have polish, not core — do this last, and skip it
+6. [ ] Serving: a FastAPI `/predict` endpoint
+7. [ ] MLflow experiment tracking
+8. [~] Tests: no-leakage checks + API tests
+9. [ ] CI (GitHub Actions running tests on push)
+10. [ ] Docker (nice-to-have polish, not core — do this last, and skip it
     entirely if time is short)
 
 **Explicitly out of scope. Do NOT build these unless the user asks:**
@@ -250,23 +253,40 @@ Work in this order. Get each step correct and tested before moving to the
 next — the feature pipeline is the part most likely to have subtle bugs, so
 don't rush it.
 
-1. Data ingestion (BTS + NOAA, cached locally, scoped to chosen hub airports
-   and date range)
-2. Point-in-time feature pipeline in Polars, with leakage tests written
-   alongside each feature as it's built (not after)
-3. Classification baseline + evaluation harness (time-split, ROC-AUC,
-   PR-AUC, calibration)
-4. XGBoost/LightGBM classifier, compared against baseline
-5. PyTorch neural net classifier, compared against both
-6. Regression baseline + XGBoost/LightGBM regressor for delay minutes
+Status key: `[x]` done & verified · `[~]` in progress / partial · `[ ]` not started.
+Updated 2026-09-22.
+
+1. [~] Data ingestion (BTS + NOAA, cached locally, scoped to chosen hub airports
+   and date range) — hub list (ATL, DFW, DEN, ORD, LAX, JFK, LAS, MCO, MIA,
+   CLT, SEA, PHX, EWR, SFO, IAH) and date range (2023-01 to 2024-12) confirmed
+   with user. `data/ingest_bts.py` and `data/ingest_noaa.py` write, verified
+   end-to-end against real BTS + NOAA data for one sample month/station.
+   Remaining: run the full 24-month × 15-airport pull, then review.
+2. [~] Point-in-time feature pipeline in Polars, with leakage tests written
+   alongside each feature as it's built (not after) — `features/calendar.py`,
+   `weather.py`, `tail_propagation.py`, `hub_backlog.py`, `target_encoding.py`
+   written with 8 passing leakage tests, but only against synthetic
+   single-timezone fixtures, never real ingested data. Known gap: no UTC
+   conversion — needs to switch to the `*_utc` columns ingestion now
+   produces before it's trustworthy across the 4 timezones in scope.
+3. [~] Classification baseline + evaluation harness (time-split, ROC-AUC,
+   PR-AUC, calibration) — `models/baseline.py` + `evaluation/metrics.py`
+   written (time_based_split, ROC-AUC/PR-AUC/Brier/catch-rate, calibration
+   table), not yet run against real data.
+4. [ ] XGBoost/LightGBM classifier, compared against baseline
+5. [ ] PyTorch neural net classifier, compared against both
+6. [~] Regression baseline + XGBoost/LightGBM regressor for delay minutes
    (trained only on delayed flights), evaluated with MAE/RMSE against its
-   baseline
-7. SHAP explainability for the classifier and the regressor
-8. MLflow tracking wired into all of the above
-9. FastAPI serving returning both outputs together
-10. CI (GitHub Actions running pytest)
-11. Docker (optional, last)
-12. README with results tables (classification + regression), SHAP charts,
+   baseline — baseline (`add_route_hour_avg_delay_minutes` +
+   `regression_baseline_minutes`) and RMSE/MAE metrics written; regressor
+   itself not started.
+7. [ ] SHAP explainability for the classifier and the regressor
+8. [ ] MLflow tracking wired into all of the above
+9. [ ] FastAPI serving returning both outputs together (`api/__init__.py` is
+   an empty placeholder)
+10. [ ] CI (GitHub Actions running pytest)
+11. [ ] Docker (optional, last) — `Dockerfile` is an empty placeholder
+12. [ ] README with results tables (classification + regression), SHAP charts,
     calibration plot, and a short write-up of the tail-number and
     hub-backlog features and how leakage was avoided
 
