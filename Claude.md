@@ -93,8 +93,10 @@ resume project. Ask before adding anything not on the Features list below.
   carrier, origin/destination.
 - **NOAA weather** (hourly METAR/ISD): weather observations per airport per
   hour.
-- Scope: top 10-15 US hub airports, 1-2 years of data. This is still
-  millions of rows — do not expand beyond this without asking.
+- Scope: top 15 US hub airports, 1 year of data (2024-01 to 2024-12,
+  narrowed from the original 2023-2024 range on 2026-09-22 to keep scope
+  tight). This is still millions of rows — do not expand beyond this
+  without asking.
 - Target: `departure_delay >= 15` (binary). Expect roughly an 80/20
   on-time/delayed split — this is real class imbalance, not a bug (see
   Evaluation).
