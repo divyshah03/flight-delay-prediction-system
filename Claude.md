@@ -260,7 +260,7 @@ don't rush it.
 Status key: `[x]` done & verified · `[~]` in progress / partial · `[ ]` not started.
 Updated 2026-09-22.
 
-1. [~] Data ingestion (BTS + NOAA, cached locally, scoped to chosen hub airports
+1. [x] Data ingestion (BTS + NOAA, cached locally, scoped to chosen hub airports
    and date range) — hub list (ATL, DFW, DEN, ORD, LAX, JFK, LAS, MCO, MIA,
    CLT, SEA, PHX, EWR, SFO, IAH) confirmed with user. Date range: **2024-01–
    2024-12 only** (12 months), confirmed to stay on 2024 on 2026-09-23 after
