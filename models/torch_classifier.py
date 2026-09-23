@@ -28,6 +28,8 @@ from evaluation.metrics import FEATURE_COLUMNS, classification_metrics, time_bas
 ARTIFACT_DIR = Path(__file__).resolve().parent.parent / "artifacts"
 ARTIFACT_DIR.mkdir(exist_ok=True)
 
+SEED = 42
+
 CAT_COLUMNS = ["Origin", "Reporting_Airline", "route"]
 EMBED_DIMS = {"Origin": 6, "Reporting_Airline": 6, "route": 12}
 UNK_INDEX = 0
