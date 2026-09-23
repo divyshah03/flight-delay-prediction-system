@@ -143,7 +143,7 @@ def train_classifier(
     report = classification_metrics(y_test, proba)
 
     with mlflow.start_run(run_name="pytorch_classifier"):
-        mlflow.log_params({"epochs": epochs, "batch_size": batch_size, "lr": lr, "hidden": "128,64"})
+        mlflow.log_params({"epochs": epochs, "batch_size": batch_size, "lr": lr, "hidden": "128,64", "seed": seed})
         mlflow.log_metrics(
             {
                 "roc_auc": report.roc_auc,
