@@ -27,26 +27,27 @@ asking first — this project has a documented history of scope creep and we
 are deliberately keeping it tight.
 
 Status key: `[x]` done & verified · `[~]` in progress / partial · `[ ]` not started.
-Updated 2026-09-22 — see Build order below for the step-by-step breakdown.
+Updated 2026-09-23 — see Build order below for the step-by-step breakdown.
 
-1. [~] Data ingestion: BTS On-Time Performance + NOAA weather
-2. [~] Point-in-time feature pipeline (see Features below — this is the core of
+1. [x] Data ingestion: BTS On-Time Performance + NOAA weather
+2. [x] Point-in-time feature pipeline (see Features below — this is the core of
    the project)
-3. [~] Baseline models (historical delay rate lookup for classification;
+3. [x] Baseline models (historical delay rate lookup for classification;
    historical average delay minutes for regression)
-4. [ ] Two trained classification models (XGBoost/LightGBM and a PyTorch
+4. [x] Two trained classification models (XGBoost/LightGBM and a PyTorch
    neural net) predicting delay probability, PLUS one regression model
    (XGBoost/LightGBM is fine — do not build a second PyTorch model for
    this) predicting expected delay minutes, trained only on flights that
    were actually delayed
-5. [~] Evaluation: time-based split, ROC-AUC + PR-AUC + calibration for
+5. [x] Evaluation: time-based split, ROC-AUC + PR-AUC + calibration for
    classification, MAE/RMSE for regression, SHAP for both
-6. [ ] Serving: a FastAPI `/predict` endpoint
-7. [ ] MLflow experiment tracking
-8. [~] Tests: no-leakage checks + API tests
-9. [ ] CI (GitHub Actions running tests on push)
-10. [ ] Docker (nice-to-have polish, not core — do this last, and skip it
-    entirely if time is short)
+6. [x] Serving: a FastAPI `/predict` endpoint
+7. [x] MLflow experiment tracking
+8. [x] Tests: no-leakage checks + API tests
+9. [x] CI (GitHub Actions running tests on push)
+10. [~] Docker (nice-to-have polish, not core — do this last, and skip it
+    entirely if time is short) — Dockerfile exists and reviewed, but not
+    build-tested (no Docker daemon available in this environment).
 
 **Explicitly out of scope. Do NOT build these unless the user asks:**
 - Any frontend (no React, no web UI). A Streamlit demo is optional
