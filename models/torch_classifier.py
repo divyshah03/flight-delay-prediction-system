@@ -77,7 +77,17 @@ def train_classifier(
     epochs: int = 15,
     batch_size: int = 2048,
     lr: float = 1e-3,
+    seed: int = SEED,
 ) -> dict:
+    # Fixed seed for reproducibility: covers weight init (nn.Linear/nn.Embedding
+    # draw from the global RNG at construction time) and the train DataLoader's
+    # shuffle order, both of which are otherwise nondeterministic run-to-run.
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
     frame = pl.read_parquet(features_path)
     train, test = time_based_split(frame)
 
