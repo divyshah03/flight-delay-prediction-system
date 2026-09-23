@@ -154,18 +154,6 @@ Two real bugs surfaced running the pipeline against real 2024 BTS data for the f
 
 Both fixed (exclude `Cancelled=1` from all historical aggregates) and covered by regression tests. Diverted-flight handling in tail propagation was found and fixed the same way.
 
-## ✂️ What I deliberately left out, and why
-
-- **Crew connection risk / tight-turn modeling** — crew scheduling data isn't realistically available outside an airline.
-- **Crosswind via runway-heading trigonometry** — real signal, but out of scope for this size project.
-- **Weather forecast divergence deltas** — legitimate stretch goal, not required.
-- **Continuous holiday-proximity curves** — a binary `is_holiday` flag is enough.
-- **Airport capacity tiering** beyond what's a byproduct of hub backlog.
-- **Multi-airline crew/aircraft rotation graphs** — a materially larger project.
-- **Real-time/streaming inference** — this is a batch, historical project.
-
-Rule applied: if a feature idea couldn't be explained correctly in one sentence, it didn't belong here.
-
 ## 🏗️ Architecture
 
 ```
