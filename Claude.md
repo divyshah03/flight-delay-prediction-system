@@ -328,17 +328,20 @@ Updated 2026-09-22.
     incorrectly marked `[ ]`); runs `pytest tests/` on push/PR. The
     real-data-only tests (test_model_sanity.py) skip cleanly in CI since a
     fresh checkout has no ingested data/trained artifacts.
-11. [~] Docker — `Dockerfile` already implemented (was incorrectly marked
-    "empty placeholder"); reviewed statically (copies api/, evaluation/,
-    models/, features/, data config, and artifacts/, matching what
-    api/main.py actually imports) but not build-tested — no Docker daemon
-    available in this environment.
+11. [x] Docker — `Dockerfile` already implemented (was incorrectly marked
+    "empty placeholder"); built and run end-to-end on 2026-09-23 (Docker
+    Desktop started for this specifically): `docker build` succeeded,
+    `docker run` served real traffic, and `/health` + `/predict` returned
+    output identical to the non-containerized API. Cleaned up after
+    (container/image removed).
 12. [x] README written: problem statement, weather look-ahead trap
     (including the BTS-DST-vs-NOAA-fixed-offset variant), tail-propagation
     and hub-backlog write-ups, classification + regression results tables,
-    SHAP tables, calibration tables for both classifiers, example
-    /predict output, and a "what was left out" section reusing the Scope
-    list above.
+    real SHAP charts and a calibration reliability chart (generated via
+    `evaluation/report_xgboost.py` + `evaluation/report_torch.py`, run as
+    two separate scripts — importing xgboost/shap and torch in the same
+    process segfaults on this machine), example /predict output, and a
+    "what was left out" section reusing the Scope list above.
 
 Note on this file's own accuracy: steps 4, 6, 7, 8, 9, 10, 11 above were
 previously marked `[ ]`/`[~]` despite `models/xgboost_classifier.py`,
