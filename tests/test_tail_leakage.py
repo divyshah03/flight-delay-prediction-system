@@ -50,6 +50,7 @@ def make_tail_frame() -> pl.DataFrame:
             "actual_dep_dt": base + timedelta(minutes=5),
             "actual_arr_dt": base + timedelta(hours=2, minutes=5),
             "DepDelayMinutes": 5.0,
+            "Diverted": 0,
         },
         {  # return leg, lands back at ATL before F2's cutoff
             "flight_id": "F1B",
