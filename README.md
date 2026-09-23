@@ -60,58 +60,44 @@ XGBoost tracks the diagonal closely; PyTorch sits below it at every decile — i
 | 0.229 | 0.263 | 87,805 |
 | 0.367 | 0.384 | 87,805 |
 
-XGBoost consistently under-predicts risk by a few points but tracks the true
-rate closely and monotonically — reasonably honest probabilities.
+</details>
 
-**PyTorch** (same deciles):
+<details>
+<summary><b>PyTorch calibration deciles</b></summary>
 
 | Predicted | Actual | n |
 |---|---|---|
-| 0.131 | 0.060 | 87,806 |
-| 0.205 | 0.091 | 87,806 |
-| 0.256 | 0.109 | 87,806 |
-| 0.299 | 0.126 | 87,806 |
-| 0.342 | 0.147 | 87,806 |
-| 0.388 | 0.167 | 87,806 |
-| 0.438 | 0.194 | 87,806 |
-| 0.494 | 0.224 | 87,805 |
-| 0.567 | 0.268 | 87,805 |
-| 0.710 | 0.397 | 87,805 |
+| 0.141 | 0.061 | 87,806 |
+| 0.215 | 0.091 | 87,806 |
+| 0.267 | 0.115 | 87,806 |
+| 0.313 | 0.131 | 87,806 |
+| 0.361 | 0.150 | 87,806 |
+| 0.413 | 0.169 | 87,806 |
+| 0.470 | 0.193 | 87,806 |
+| 0.534 | 0.224 | 87,805 |
+| 0.612 | 0.265 | 87,805 |
+| 0.747 | 0.384 | 87,805 |
 
-PyTorch is substantially overconfident at every decile — no calibration step
-(e.g. Platt scaling) was applied, which is consistent with the worse Brier
-score above. For a real deployment where the probability *number* is shown
-to a person (as this project's combined output does), that argues for
-serving XGBoost's probability even though PyTorch discriminates slightly
-better — a genuine, unresolved tradeoff, not something either model "wins."
+</details>
+
+No calibration step (e.g. Platt scaling) was applied to PyTorch — consistent with its worse Brier score. For a real deployment showing the probability *number* to a person, that argues for serving XGBoost's probability despite PyTorch's marginal edge on ranking — a genuine tradeoff, not a clean win either way.
 
 ### Regression — expected delay minutes (given a delay)
 
-Trained and evaluated only on flights with `DepDelayMinutes >= 15` (156,567
-in the test set) — predicting delay length for an on-time flight isn't a
-meaningful target.
+Trained/evaluated only on flights with `DepDelayMinutes >= 15` (156,567 in test) — predicting delay length for an on-time flight isn't meaningful.
 
-| Model | MAE (minutes) | RMSE (minutes) |
+| Model | MAE (min) | RMSE (min) |
 |---|---|---|
-| Baseline (route/hour historical average, among delayed peers) | 45.55 | 85.15 |
+| Baseline (route/hour average) | 45.55 | 85.15 |
 | XGBoost | **45.41** | **83.11** |
 
-**Plain language**: given a flight is delayed, the model predicts how late
-it will be to within about 45 minutes on average — a modest improvement over
-the baseline's 46 minutes. Delay-length regression is a genuinely harder
-problem than delay classification here: once a flight is delayed at all, the
-remaining variance (mechanical issues, crew timeouts, cascading reactionary
-delays) is dominated by information this project deliberately doesn't model
-(see below), so this small-but-real edge over the baseline is the honest
-result, not a shortfall in the modeling.
+🎯 **Plain language:** given a flight is delayed, the model predicts how late to within ~45 minutes — a modest edge over the 46-minute baseline. Once a flight is delayed at all, most remaining variance (mechanical, crew, reactionary delays) is information this project deliberately doesn't model — so this small edge is the honest result, not a shortfall.
 
-### SHAP feature importance
+### 🔍 SHAP feature importance
 
-**Classifier:**
+**Classifier**
 
-![SHAP feature importance — XGBoost classifier](evaluation/plots/shap_classifier.png)
-
-Top features by mean |SHAP value|:
+<img src="evaluation/plots/shap_classifier.png" alt="SHAP — XGBoost classifier" width="380">
 
 | Feature | Mean \|SHAP\| |
 |---|---|
