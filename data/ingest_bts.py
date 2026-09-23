@@ -155,8 +155,7 @@ def _add_utc_timestamps(df: pl.DataFrame) -> pl.DataFrame:
             pl.when(is_dest_hub).then(to_utc("_actual_arr_local_naive")).otherwise(pl.col("actual_arr_utc")).alias("actual_arr_utc"),
         )
 
-    return out.drop(
-        "_sched_dep_local_naive",
+    return out.rename({"_sched_dep_local_naive": "scheduled_dep_local"}).drop(
         "_actual_dep_local_naive",
         "_sched_arr_local_naive",
         "_actual_arr_local_naive",
@@ -178,6 +177,8 @@ def load_and_filter_month(zip_path: Path, hub_airports: list[str] = HUB_AIRPORTS
                     "DepTime": pl.Utf8,
                     "CRSArrTime": pl.Utf8,
                     "ArrTime": pl.Utf8,
+                    "WheelsOff": pl.Utf8,
+                    "WheelsOn": pl.Utf8,
                     "Tail_Number": pl.Utf8,
                     "CancellationCode": pl.Utf8,
                 },
