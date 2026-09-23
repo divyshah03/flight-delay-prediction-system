@@ -36,13 +36,20 @@ def add_hub_backlog(flights: pl.DataFrame, window_hours: int = 3) -> pl.DataFram
     Cutoff rule: only flights with actual_dep_dt < cutoff_dt and
     actual_dep_dt >= cutoff_dt - window_hours at the same Origin contribute.
     """
-    required = {"flight_id", "Origin", "cutoff_dt", "actual_dep_dt", "DepDelayMinutes"}
+    required = {"flight_id", "Origin", "cutoff_dt", "actual_dep_dt", "DepDelayMinutes", "Cancelled"}
     missing = required - set(flights.columns)
     if missing:
         raise ValueError(f"flights missing columns for hub backlog: {sorted(missing)}")
 
+    # Cancelled=1 rows are excluded explicitly, not just via actual_dep_dt
+    # being null: a small number of BTS rows record a real DepTime (taxi/
+    # pushback) for a flight ultimately cancelled, leaving DepDelayMinutes
+    # null even though actual_dep_dt is populated -- and a null value_col
+    # entry poisons the cum_sum-based windowed aggregate at that exact row
+    # (Polars' cum_sum emits null, not the carried-forward total, at a null
+    # input), which then corrupts every window whose as-of match lands on it.
     history = (
-        flights.filter(pl.col("actual_dep_dt").is_not_null())
+        flights.filter(pl.col("actual_dep_dt").is_not_null() & (pl.col("Cancelled") == 0))
         .select(
             "Origin",
             "actual_dep_dt",
