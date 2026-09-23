@@ -12,6 +12,7 @@ that a real deployment, trained only on past data, wouldn't have.
 
 from __future__ import annotations
 
+import random
 from pathlib import Path
 
 import mlflow
