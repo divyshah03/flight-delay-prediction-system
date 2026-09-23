@@ -91,3 +91,7 @@ dmypy.json
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local AI working notes — not for the public repo
+Claude.md
+CLAUDE.md
