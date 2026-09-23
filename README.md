@@ -124,12 +124,9 @@ Trained/evaluated only on flights with `DepDelayMinutes >= 15` (156,567 in test)
 | origin_temperature_f | 2.47 |
 | origin_ceiling_ft | 1.61 |
 
-The moving-window target encodings dominate classification (unsurprising —
-they're the same signal as the baseline, refined), while for *how late* a
-flight will be, the two headline point-in-time features (hub backlog, tail
-propagation) and seasonality matter more than which route it is.
+Target encodings dominate classification (unsurprising — same signal as the baseline, refined). For *how late*, the two headline features and seasonality matter more than the route.
 
-## Example output
+## 🚀 Example output
 
 ```
 POST /predict
