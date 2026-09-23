@@ -185,19 +185,11 @@ python -m features.build
 python -m models.xgboost_classifier
 python -m models.xgboost_regressor
 python -m models.torch_classifier
-python -m evaluation.report_xgboost   # SHAP charts + XGBoost calibration
+python -m evaluation.report_xgboost   # SHAP + XGBoost calibration
 python -m evaluation.report_torch     # PyTorch calibration + combined chart
 uvicorn api.main:app --reload
 ```
 
-`report_xgboost` and `report_torch` are deliberately two separate scripts,
-run in either order: importing `xgboost`/`shap` and `torch` in the same
-process segfaults on at least one dev machine (a native duplicate-OpenMP-
-runtime conflict between the two libraries, unrelated to this project's own
-code). Each writes its model's calibration table to `artifacts/calibration/`;
-whichever script runs second finds the other's table there and produces the
-combined `evaluation/plots/calibration_classifiers.png`.
+`report_xgboost` and `report_torch` run as two separate scripts (in either order) — importing `xgboost`/`shap` and `torch` in the same process segfaults on at least one dev machine (native OpenMP conflict, not this project's bug). Each writes its calibration table to `artifacts/calibration/`; whichever runs second completes the combined chart.
 
-MLflow tracks every training run's params, metrics, and model artifacts
-(`mlruns/`, local file store). Run `mlflow ui` from the project root to
-browse them.
+MLflow tracks every run's params/metrics/artifacts in `mlruns/` (local file store — set `MLFLOW_TRACKING_URI=./mlruns` and `MLFLOW_ALLOW_FILE_STORE=true`, since MLflow 3.x defaults to a SQLite backend otherwise). Run `mlflow ui` to browse.
