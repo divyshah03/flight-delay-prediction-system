@@ -12,7 +12,7 @@ import polars as pl
 import pytest
 
 from data.config import month_range
-from data.ingest_bts import bts_zip_url
+from data.ingest_bts import _add_utc_timestamps, bts_zip_url
 from data.ingest_noaa import _parse_ceiling_ft, _strip_flag_suffix, station_year_url
 
 
