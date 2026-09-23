@@ -15,6 +15,9 @@ shap>=0.44
 # Experiment tracking
 mlflow>=2.10
 
+# Reporting
+matplotlib>=3.8
+
 # Serving
 fastapi>=0.110
 uvicorn[standard]>=0.27
