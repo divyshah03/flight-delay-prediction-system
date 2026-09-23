@@ -2,13 +2,32 @@
 
 Percentage of flights that departed the same origin airport delayed during the
 3 hours immediately before the current flight's cutoff.
+
+Implemented as a cumulative-count as-of join rather than a self-join: a naive
+`join(on="Origin").filter(window)` self-join is O(n^2) per origin -- at real
+BTS scale (a busy hub sees hundreds of thousands of departures over 2 years)
+that is not just slow, it doesn't finish. Instead: sort each origin's history
+by departure time, take a running cumulative count and cumulative delayed
+count, then for any cutoff-relative window [a, b) the answer is
+cumulative(b) - cumulative(a), found via two backward as-of joins. This is
+O(n log n) and gives bit-identical results to the self-join definition it
+replaces.
 """
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import polars as pl
 
 from data.config import DELAY_THRESHOLD_MINUTES
+
+# Subtracted from a query boundary before the as-of join so that "backward,
+# nearest at or before" becomes "strictly before" -- join_asof has no
+# exclusive-bound mode, and history timestamps are minute-resolution, so a
+# microsecond epsilon can never mask a real match while still excluding a
+# row exactly on the boundary.
+_EPSILON = timedelta(microseconds=1)
 
 
 def add_hub_backlog(flights: pl.DataFrame, window_hours: int = 3) -> pl.DataFrame:
@@ -22,35 +41,62 @@ def add_hub_backlog(flights: pl.DataFrame, window_hours: int = 3) -> pl.DataFram
     if missing:
         raise ValueError(f"flights missing columns for hub backlog: {sorted(missing)}")
 
-    current = flights.select(["flight_id", "Origin", "cutoff_dt"])
-    history = flights.select(
-        [
-            pl.col("Origin"),
-            pl.col("actual_dep_dt"),
-            pl.col("DepDelayMinutes"),
-            pl.col("flight_id").alias("hist_flight_id"),
-        ]
+    history = (
+        flights.filter(pl.col("actual_dep_dt").is_not_null())
+        .select(
+            "Origin",
+            "actual_dep_dt",
+            (pl.col("DepDelayMinutes") >= DELAY_THRESHOLD_MINUTES).cast(pl.Int64).alias("was_delayed"),
+        )
+        .sort(["Origin", "actual_dep_dt"])
+        .with_columns(
+            pl.int_range(1, pl.len() + 1).over("Origin").alias("cum_count"),
+            pl.col("was_delayed").cum_sum().over("Origin").alias("cum_delayed"),
+        )
     )
 
+    bounds = flights.select(
+        "flight_id",
+        "Origin",
+        (pl.col("cutoff_dt") - _EPSILON).alias("_upper_q"),
+        (pl.col("cutoff_dt") - pl.duration(hours=window_hours) - _EPSILON).alias("_lower_q"),
+    )
+
+    def cumulative_as_of(query_col: str) -> pl.DataFrame:
+        left = (
+            bounds.select("flight_id", "Origin", query_col)
+            .sort(["Origin", query_col])
+        )
+        joined = left.join_asof(
+            history,
+            left_on=query_col,
+            right_on="actual_dep_dt",
+            by="Origin",
+            strategy="backward",
+        )
+        return joined.select(
+            "flight_id",
+            pl.col("cum_count").fill_null(0),
+            pl.col("cum_delayed").fill_null(0),
+        )
+    upper = cumulative_as_of("_upper_q").rename({"cum_count": "upper_count", "cum_delayed": "upper_delayed"})
+    lower = cumulative_as_of("_lower_q").rename({"cum_count": "lower_count", "cum_delayed": "lower_delayed"})
+
     window = (
-        current.join(history, on="Origin", how="left")
-        .filter(
-            pl.col("actual_dep_dt").is_not_null()
-            & (pl.col("actual_dep_dt") < pl.col("cutoff_dt"))
-            & (
-                pl.col("actual_dep_dt")
-                >= (pl.col("cutoff_dt") - pl.duration(hours=window_hours))
-            )
-            & (pl.col("hist_flight_id") != pl.col("flight_id"))
+        bounds.select("flight_id")
+        .join(upper, on="flight_id", how="left")
+        .join(lower, on="flight_id", how="left")
+        .with_columns(
+            (pl.col("upper_count") - pl.col("lower_count")).alias("hub_window_n"),
+            (pl.col("upper_delayed") - pl.col("lower_delayed")).alias("hub_window_delayed"),
         )
         .with_columns(
-            (pl.col("DepDelayMinutes") >= DELAY_THRESHOLD_MINUTES).cast(pl.Int8).alias("was_delayed")
+            pl.when(pl.col("hub_window_n") > 0)
+            .then(pl.col("hub_window_delayed") / pl.col("hub_window_n"))
+            .otherwise(0.0)
+            .alias("hub_backlog_pct")
         )
-        .group_by("flight_id")
-        .agg(
-            pl.len().alias("hub_window_n"),
-            pl.col("was_delayed").mean().alias("hub_backlog_pct"),
-        )
+        .select("flight_id", "hub_window_n", "hub_backlog_pct")
     )
 
     return flights.join(window, on="flight_id", how="left").with_columns(
