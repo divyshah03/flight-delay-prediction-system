@@ -72,6 +72,7 @@ def make_tail_frame() -> pl.DataFrame:
             "actual_dep_dt": base + timedelta(hours=10, minutes=15),
             "actual_arr_dt": base + timedelta(hours=12, minutes=15),
             "DepDelayMinutes": 15.0,
+            "Diverted": 0,
         },
     ]
     return pl.DataFrame(
