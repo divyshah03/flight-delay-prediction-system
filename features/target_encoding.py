@@ -39,9 +39,14 @@ def windowed_rate(
     models/baseline.py averages only over historically-DELAYED peers, not
     every peer. Defaults to `flights` itself (target encoding's case).
     """
+    # Cancelled=1 rows are excluded explicitly, not just via actual_dep_dt
+    # being null -- see features/hub_backlog.py's module comment on the same
+    # filter: a handful of BTS rows have a real DepTime despite Cancelled=1,
+    # leaving value_col null, which poisons the cum_sum-based aggregate at
+    # that row for every window whose as-of match lands on it.
     history_source = flights if history_source is None else history_source
     history = (
-        history_source.filter(pl.col("actual_dep_dt").is_not_null())
+        history_source.filter(pl.col("actual_dep_dt").is_not_null() & (pl.col("Cancelled") == 0))
         .select(*group_cols, "actual_dep_dt", value_col)
         .sort([*group_cols, "actual_dep_dt"])
         .with_columns(
