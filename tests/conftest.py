@@ -31,6 +31,7 @@ def make_flight_frame() -> pl.DataFrame:
             "scheduled_dep_dt": base + timedelta(hours=6),
             "actual_dep_dt": base + timedelta(hours=6, minutes=40),
             "DepDelayMinutes": 40.0,
+            "Cancelled": 0,
         },
         {
             "flight_id": "F3",
