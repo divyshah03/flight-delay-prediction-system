@@ -43,7 +43,7 @@ def _latest_weather_asof(
     )
 
     rename_map = {
-        "temp_c": f"{prefix}_temp_c",
+        "temperature_f": f"{prefix}_temperature_f",
         "wind_speed_kt": f"{prefix}_wind_speed_kt",
         "precip_in": f"{prefix}_precip_in",
         "visibility_mi": f"{prefix}_visibility_mi",
