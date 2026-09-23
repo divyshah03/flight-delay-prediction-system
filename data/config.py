@@ -23,7 +23,7 @@ HUB_AIRPORTS: list[str] = [
     "SEA", "PHX", "EWR", "SFO", "IAH",
 ]
 
-START_YEAR_MONTH: tuple[int, int] = (2023, 1)
+START_YEAR_MONTH: tuple[int, int] = (2024, 1)
 END_YEAR_MONTH: tuple[int, int] = (2024, 12)
 
 # Aliases for the feature/model/eval scaffold's expected names (see module
