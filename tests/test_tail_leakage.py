@@ -61,6 +61,7 @@ def make_tail_frame() -> pl.DataFrame:
             "actual_dep_dt": None,
             "actual_arr_dt": base + timedelta(hours=5),  # 21:00
             "DepDelayMinutes": 30.0,
+            "Diverted": 0,
         },
         {
             "flight_id": "F2",
